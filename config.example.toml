@@ -1,0 +1,20 @@
+# AIMP Discord RPC Configuration
+# Place in %APPDATA%/aimp-discord-rpc/config.toml (Windows)
+# or ~/.config/aimp-discord-rpc/config.toml (Linux)
+
+# Discord Application ID (create at https://discord.com/developers/applications)
+app_id = 429559336982020107
+
+# How often to poll AIMP for track info (milliseconds)
+poll_interval_ms = 2000
+
+# Discord Rich Presence asset keys (upload in Discord Developer Portal)
+large_image_key = "aimp_logo"
+small_image_play = "play"
+small_image_pause = "pause"
+
+# Show elapsed time in Discord status
+show_timestamps = true
+
+# Show album name as large image text
+show_album = true

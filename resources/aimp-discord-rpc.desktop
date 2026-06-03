@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=AIMP Discord RPC
+Comment=Discord Rich Presence for AIMP music player
+GenericName=Discord RPC
+Exec=aimp-discord-rpc
+Icon=aimp-discord-rpc
+Terminal=false
+Type=Application
+Categories=Audio;Utility;
+StartupNotify=false
