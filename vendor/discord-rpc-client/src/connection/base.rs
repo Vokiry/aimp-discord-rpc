@@ -1,10 +1,11 @@
 use std::{
-    io::{Write, Read, ErrorKind},
+    io::{self, Write, Read, ErrorKind},
     marker::Sized,
     path::PathBuf,
     thread,
-    time
+    time,
 };
+use byteorder::{ReadBytesExt, LittleEndian};
 use serde_json::json;
 use log::{debug, error};
 use crate::{
@@ -86,15 +87,37 @@ pub trait Connection: Sized {
 
     /// Receive a message from the server.
     fn recv(&mut self) -> Result<Message> {
-        let mut buf = [0; 1024];
-        let n = self.socket().read(&mut buf)?;
-        debug!("Received {} bytes", n);
-
-        if n == 0 {
-            return Err(Error::ConnectionClosed);
+        fn read_n<R: Read>(reader: &mut R, buf: &mut [u8]) -> io::Result<()> {
+            let mut offset = 0;
+            while offset < buf.len() {
+                match reader.read(&mut buf[offset..]) {
+                    Ok(0) => return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "unexpected EOF")),
+                    Ok(n) => offset += n,
+                    Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
+                        thread::sleep(time::Duration::from_millis(10));
+                    }
+                    Err(e) => return Err(e),
+                }
+            }
+            Ok(())
         }
 
-        let message = Message::decode(&buf[..n])?;
+        // Read 8-byte header: opcode (u32 LE) + length (u32 LE)
+        let mut header = [0u8; 8];
+        read_n(self.socket(), &mut header)?;
+
+        let len = (&header[4..8]).read_u32::<LittleEndian>().unwrap() as usize;
+
+        // Read exactly len bytes of payload
+        let mut payload = vec![0u8; len];
+        read_n(self.socket(), &mut payload)?;
+
+        // Reconstruct full buffer for Message::decode
+        let mut full = Vec::with_capacity(8 + len);
+        full.extend_from_slice(&header);
+        full.extend_from_slice(&payload);
+
+        let message = Message::decode(&full)?;
         debug!("<- {:?}", message);
 
         Ok(message)

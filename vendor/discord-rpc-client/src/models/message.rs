@@ -1,4 +1,4 @@
-use std::{io::{Write, Read}, mem::size_of};
+use std::{io::{self, Write}, mem::size_of};
 use byteorder::{WriteBytesExt, ReadBytesExt, LittleEndian};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
@@ -44,8 +44,9 @@ impl Message {
     pub fn decode(mut bytes: &[u8]) -> Result<Self> {
         let opcode = OpCode::from_u32(bytes.read_u32::<LittleEndian>()?).ok_or(Error::Conversion)?;
         let len = bytes.read_u32::<LittleEndian>()? as usize;
-        let mut payload = String::with_capacity(len);
-        bytes.read_to_string(&mut payload)?;
+        let actual = bytes.len().min(len);
+        let payload = String::from_utf8(bytes[..actual].to_vec())
+            .map_err(|_| Error::IoError(io::Error::new(io::ErrorKind::InvalidData, "invalid UTF-8")))?;
 
         Ok(Self { opcode, payload })
     }

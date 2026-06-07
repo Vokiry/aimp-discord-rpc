@@ -1,3 +1,4 @@
+use std::time::Duration;
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use crate::{
@@ -60,7 +61,7 @@ impl Client {
     {
         let message = Message::new(OpCode::Frame, Payload::with_nonce(cmd, Some(args), None, evt));
         self.connection_manager.send(message)?;
-        let Message { payload, .. } = self.connection_manager.recv()?;
+        let Message { payload, .. } = self.connection_manager.recv_timeout(Duration::from_secs(5))?;
         let response: Payload<E> = serde_json::from_str(&payload)?;
 
         match response.evt {

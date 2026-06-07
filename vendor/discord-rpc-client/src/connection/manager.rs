@@ -1,7 +1,7 @@
 use std::{
     thread,
     sync::{Arc, Mutex},
-    time,
+    time::{self, Duration},
     io::ErrorKind
 };
 use log::{debug, error};
@@ -62,6 +62,13 @@ impl Manager {
 
     pub fn recv(&self) -> Result<Message> {
         match self.inbound.0.recv() {
+            Ok(message) => Ok(message),
+            Err(_) => Err(Error::ConnectionClosed),
+        }
+    }
+
+    pub fn recv_timeout(&self, timeout: Duration) -> Result<Message> {
+        match self.inbound.0.recv_timeout(timeout) {
             Ok(message) => Ok(message),
             Err(_) => Err(Error::ConnectionClosed),
         }
@@ -143,13 +150,12 @@ fn send_and_receive(connection: &mut SocketConnection, event_handler_registry: &
 
     let payload: Payload<JsonValue> = serde_json::from_str(&msg.payload)?;
 
-    match &payload {
-        Payload { evt: Some(event), .. } => {
-            event_handler_registry.handle(event.clone(), payload.data.unwrap())?;
-        },
-        _ => {
-            inbound.send(msg).expect("Failed to send received data");
-        },
+    if let Some(event) = &payload.evt {
+        if let Some(data) = payload.data {
+            event_handler_registry.handle(event.clone(), data)?;
+        }
+    } else {
+        let _ = inbound.send(msg);
     }
 
     Ok(())
