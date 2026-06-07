@@ -74,7 +74,7 @@ pub fn update_icon(ctx: &TrayContext, info: &TrackInfo) {
     ctx.tray.set_icon(Some(make_default_icon())).ok();
 }
 
-pub fn create_tray() -> TrayContext {
+pub fn create_tray() -> Option<TrayContext> {
     let icon = make_default_icon();
 
     let play_pause = MenuItem::new("Воспроизвести / Пауза", true, None);
@@ -91,21 +91,27 @@ pub fn create_tray() -> TrayContext {
     menu.append(&PredefinedMenuItem::separator()).ok();
     menu.append(&quit).ok();
 
-    let tray = TrayIconBuilder::new()
+    let tray = match TrayIconBuilder::new()
         .with_menu(Box::new(menu))
         .with_tooltip("AIMP Discord RPC")
         .with_icon(icon)
         .build()
-        .expect("Failed to build tray icon");
+    {
+        Ok(t) => t,
+        Err(e) => {
+            log::warn!("Failed to create tray icon (running without tray): {}", e);
+            return None;
+        }
+    };
 
-    TrayContext {
+    Some(TrayContext {
         play_pause,
         stop,
         next,
         prev,
         quit,
         tray,
-    }
+    })
 }
 
 pub fn handle_event(ctx: &TrayContext, event: &MenuEvent) -> Option<PlayerCommand> {

@@ -61,8 +61,10 @@ impl Manager {
     }
 
     pub fn recv(&self) -> Result<Message> {
-        let message = self.inbound.0.recv().unwrap();
-        Ok(message)
+        match self.inbound.0.recv() {
+            Ok(message) => Ok(message),
+            Err(_) => Err(Error::ConnectionClosed),
+        }
     }
 
     fn connect(&mut self) -> Result<()> {
@@ -134,7 +136,7 @@ fn send_and_receive_loop(mut manager: Manager) {
 
 fn send_and_receive(connection: &mut SocketConnection, event_handler_registry: &mut HandlerRegistry, inbound: &mut Tx, outbound: &Rx) -> Result<()> {
     while let Ok(msg) = outbound.try_recv() {
-        connection.send(&msg).expect("Failed to send outgoing data");
+        connection.send(&msg)?;
     }
 
     let msg = connection.recv()?;

@@ -39,21 +39,25 @@ pub fn run(config: Config, running: Arc<AtomicBool>) {
         .spawn(move || {
             let mut client = DiscordClient::new(discord_config.app_id);
             client.start();
+
             while let Ok(msg) = discord_rx.recv() {
-                match msg {
-                    DiscordMessage::Update(ref track) => {
-                        client.set_activity(track, &discord_config);
-                    }
-                    DiscordMessage::Clear => {
-                        client.clear_activity();
-                    }
+                let result = match msg {
+                    DiscordMessage::Update(ref track) => client.set_activity(track, &discord_config),
+                    DiscordMessage::Clear => client.clear_activity(),
+                };
+                if let Err(e) = result {
+                    log::warn!("Discord error: {}. Reconnecting...", e);
+                    client = DiscordClient::new(discord_config.app_id);
+                    client.start();
                 }
             }
         })
         .expect("Failed to spawn Discord thread");
 
     let tray_ctx = tray::create_tray();
-    log::info!("Tray icon initialized");
+    if tray_ctx.is_some() {
+        log::info!("Tray icon initialized");
+    }
 
     let mut previous: Option<TrackInfo> = None;
 
@@ -63,15 +67,15 @@ pub fn run(config: Config, running: Arc<AtomicBool>) {
         }
 
         match player.get_info() {
-            Some(info) => {
-                let should_update = match &previous {
-                    Some(prev) => {
+            Some(ref info) => {
+                let should_update = match previous {
+                    Some(ref prev) => {
                         prev.title != info.title
                             || prev.artist != info.artist
                             || prev.state != info.state
                             || prev.album != info.album
                             || prev.art_url != info.art_url
-                            || (info.state == PlayerState::Playing)
+                            || info.state == PlayerState::Playing
                     }
                     None => true,
                 };
@@ -94,11 +98,15 @@ pub fn run(config: Config, running: Arc<AtomicBool>) {
                         );
                     }
 
-                    tray::update_icon(&tray_ctx, &info);
+                    if let Some(ref ctx) = tray_ctx {
+                        tray::update_icon(ctx, info);
+                    }
                     previous = Some(info.clone());
                 }
 
-                tray::update_tooltip(&tray_ctx, &info);
+                if let Some(ref ctx) = tray_ctx {
+                    tray::update_tooltip(ctx, info);
+                }
             }
             None => {
                 log::warn!("Lost connection to AIMP, reconnecting...");
@@ -116,17 +124,19 @@ pub fn run(config: Config, running: Arc<AtomicBool>) {
             }
         }
 
-        while let Ok(event) = tray_icon::menu::MenuEvent::receiver().try_recv() {
-            if event.id == *tray_ctx.quit.id() {
-                running.store(false, Ordering::Relaxed);
+        if let Some(ref ctx) = tray_ctx {
+            while let Ok(event) = tray_icon::menu::MenuEvent::receiver().try_recv() {
+                if event.id == *ctx.quit.id() {
+                    running.store(false, Ordering::Relaxed);
+                    break;
+                }
+                if let Some(cmd) = tray::handle_event(ctx, &event) {
+                    player.send_command(cmd);
+                }
+            }
+            if !running.load(Ordering::Relaxed) {
                 break;
             }
-            if let Some(cmd) = tray::handle_event(&tray_ctx, &event) {
-                player.send_command(cmd);
-            }
-        }
-        if !running.load(Ordering::Relaxed) {
-            break;
         }
 
         thread::sleep(Duration::from_millis(config.poll_interval_ms));

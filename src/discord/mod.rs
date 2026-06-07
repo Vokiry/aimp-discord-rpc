@@ -20,18 +20,16 @@ impl DiscordClient {
         log::info!("Discord RPC client started");
     }
 
-    pub fn set_activity(&mut self, track: &TrackInfo, config: &Config) {
+    pub fn set_activity(&mut self, track: &TrackInfo, config: &Config) -> Result<(), String> {
         let builder = activity::ActivityBuilder::new(config.clone());
         let build_fn = builder.build(track);
 
-        if let Err(e) = self.client.set_activity(build_fn) {
-            log::error!("Failed to set Discord activity: {}", e);
-        }
+        self.client.set_activity(build_fn).map_err(|e| e.to_string())?;
+        Ok(())
     }
 
-    pub fn clear_activity(&mut self) {
-        if let Err(e) = self.client.clear_activity() {
-            log::error!("Failed to clear Discord activity: {}", e);
-        }
+    pub fn clear_activity(&mut self) -> Result<(), String> {
+        self.client.clear_activity().map_err(|e| e.to_string())?;
+        Ok(())
     }
 }
