@@ -4,6 +4,10 @@ Discord Rich Presence for [AIMP](https://aimp.ru) music player (v6.00 beta for L
 
 Shows your currently playing track in your Discord profile — like Spotify or Kopuz.
 
+## Known issue
+D-Bus wont cath your track until you open some other audio that D-bsu WILL catch
+to workaround this: open video/track in your browser and then use utility 
+
 ## Features
 
 - "Listening to AIMP" activity type (not "Playing")
